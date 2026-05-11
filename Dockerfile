@@ -1,6 +1,6 @@
 # parameters
 ARG REPO_NAME="Self-driving-Portfolio-2"
-ARG DESCRIPTION=""
+ARG DESCRIPTION="Autonomous Duckiebot localization and mapping system with odometry, vision-based SLAM, EKF sensor fusion, and semantic perception (AprilTags + duckies)"
 ARG MAINTAINER="Joes van Deursen"
 # pick an icon from: https://fontawesome.com/v4.7.0/icons/
 ARG ICON="cube"

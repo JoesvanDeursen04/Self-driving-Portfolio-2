@@ -6,7 +6,7 @@ Detects and tracks visual features for mapping and localization.
 
 Topics:
     Subscribes:
-        - /duckiebot_name/camera/image_raw (sensor_msgs/Image)
+        - /{robot_name}/camera/image_raw (sensor_msgs/Image) - e.g., /duckiebot/camera/image_raw
     Publishes:
         - /slam/features (sensor_msgs/PointCloud2)
         - /slam/camera_motion (geometry_msgs/PoseStamped)

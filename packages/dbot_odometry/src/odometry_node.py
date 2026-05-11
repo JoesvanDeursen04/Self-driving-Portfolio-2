@@ -7,8 +7,8 @@ Implements differential drive kinematic model.
 
 Topics:
     Subscribes:
-        - /duckiebot_name/left_wheel_encoder (Int32)
-        - /duckiebot_name/right_wheel_encoder (Int32)
+        - /{robot_name}/left_wheel_encoder (Int32) - e.g., /duckiebot/left_wheel_encoder
+        - /{robot_name}/right_wheel_encoder (Int32) - e.g., /duckiebot/right_wheel_encoder
     Publishes:
         - /odometry (Odometry)
         - /pose (PoseStamped)
