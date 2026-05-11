@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <!-- Sensor Fusion Node Launch File -->
+    
+    <!-- Robot name parameter -->
+    <arg name="robot_name" default="duckiebot"/>
+    
+    <!-- ========== Sensor Fusion Node ========== -->
+    <node name="sensor_fusion_node" pkg="dbot_sensor_fusion" type="sensor_fusion_node.py" output="screen">
+        <param name="robot_name" value="$(arg robot_name)"/>
+        
+        <!-- Filter update rate -->
+        <param name="update_rate" value="30"/>             <!-- 30 Hz -->
+    </node>
+    
+</launch>

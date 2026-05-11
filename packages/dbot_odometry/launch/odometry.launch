@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <!-- Odometry Node Launch File -->
+    
+    <!-- Robot name parameter -->
+    <arg name="robot_name" default="duckiebot"/>
+    
+    <!-- ========== Odometry Node ========== -->
+    <node name="odometry_node" pkg="dbot_odometry" type="odometry_node.py" output="screen">
+        <param name="robot_name" value="$(arg robot_name)"/>
+        
+        <!-- Duckiebot physical parameters -->
+        <param name="wheel_radius" value="0.02"/>          <!-- 2 cm wheel radius -->
+        <param name="wheelbase" value="0.1"/>              <!-- 10 cm wheelbase -->
+        <param name="encoder_ticks_per_rev" value="135"/>  <!-- Ticks per revolution -->
+        
+        <!-- Node update rate -->
+        <param name="update_rate" value="30"/>             <!-- 30 Hz -->
+    </node>
+    
+</launch>

@@ -1,2 +1,15 @@
 # LIST YOUR PYTHON3 PACKAGES HERE
 # NOTE: only place non-Duckietown libraries here; pin versions only if necessary
+
+# Numerical computing
+numpy>=1.19.0
+scipy>=1.5.0
+
+# Computer vision
+opencv-contrib-python>=4.4.0
+
+# Visualization and data analysis
+matplotlib>=3.3.0
+
+# ROS and robotics
+tf-transformations>=2020.1.2

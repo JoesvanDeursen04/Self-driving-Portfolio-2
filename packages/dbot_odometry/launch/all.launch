@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <!-- Main Integration Launch File -->
+    <!-- Launches all localization and mapping components -->
+    
+    <!-- Robot name -->
+    <arg name="robot_name" default="duckiebot"/>
+    
+    <group ns="$(arg robot_name)">
+        <!-- ========== Odometry Node ========== -->
+        <!-- Estimates robot position from wheel encoder data -->
+        <include file="$(find dbot_odometry)/launch/odometry.launch">
+            <arg name="robot_name" value="$(arg robot_name)"/>
+        </include>
+        
+        <!-- ========== SLAM Node ========== -->
+        <!-- Detects and tracks visual features from camera -->
+        <include file="$(find dbot_slam)/launch/slam.launch">
+            <arg name="robot_name" value="$(arg robot_name)"/>
+        </include>
+        
+        <!-- ========== Sensor Fusion Node ========== -->
+        <!-- Fuses odometry and SLAM measurements using EKF -->
+        <include file="$(find dbot_sensor_fusion)/launch/fusion.launch">
+            <arg name="robot_name" value="$(arg robot_name)"/>
+        </include>
+    </group>
+    
+    <!-- Optional: Launch RViz for visualization -->
+    <arg name="launch_rviz" default="true"/>
+    <node if="$(arg launch_rviz)" name="rviz" pkg="rviz" type="rviz" 
+          args="-d $(find dbot_odometry)/rviz/localization.rviz"
+          output="screen">
+    </node>
+    
+</launch>

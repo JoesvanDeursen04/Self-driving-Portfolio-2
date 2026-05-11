@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <!-- SLAM Node Launch File -->
+    
+    <!-- Robot name parameter -->
+    <arg name="robot_name" default="duckiebot"/>
+    
+    <!-- ========== SLAM Node ========== -->
+    <node name="slam_node" pkg="dbot_slam" type="slam_node.py" output="screen">
+        <param name="robot_name" value="$(arg robot_name)"/>
+        
+        <!-- Camera calibration parameters -->
+        <!-- These are typical values for Duckiebot camera -->
+        <param name="focal_length_x" value="183"/>         <!-- fx -->
+        <param name="focal_length_y" value="183"/>         <!-- fy -->
+        <param name="principal_point_x" value="160"/>      <!-- cx -->
+        <param name="principal_point_y" value="120"/>      <!-- cy -->
+        
+        <!-- Remappings for camera topics -->
+        <remap from="/$(arg robot_name)/camera/image_raw" to="/$(arg robot_name)/camera_node/image/compressed"/>
+    </node>
+    
+</launch>

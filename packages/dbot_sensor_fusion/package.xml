@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package format="2">
+    <name>dbot_sensor_fusion</name>
+    <version>1.0.0</version>
+    <description>Duckiebot sensor fusion node combining odometry and SLAM using Extended Kalman Filter</description>
+    <maintainer email="student@duckietown.org">Student</maintainer>
+    <license>GPLv3</license>
+
+    <author email="student@duckietown.org">Student</author>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <build_depend>rospy</build_depend>
+    <build_depend>std_msgs</build_depend>
+    <build_depend>geometry_msgs</build_depend>
+    <build_depend>nav_msgs</build_depend>
+    <build_depend>tf</build_depend>
+    <build_depend>tf2</build_depend>
+
+    <run_depend>rospy</run_depend>
+    <run_depend>std_msgs</run_depend>
+    <run_depend>geometry_msgs</run_depend>
+    <run_depend>nav_msgs</run_depend>
+    <run_depend>tf</run_depend>
+    <run_depend>tf2</run_depend>
+
+</package>

@@ -8,13 +8,19 @@ dt-launchfile-init
 # YOUR CODE BELOW THIS LINE
 # ----------------------------------------------------------------------------
 
+# Get robot parameters
+ROBOT_NAME=${ROBOT_NAME:-duckiebot}
+ROBOT_ID=${ROBOT_ID:-00}
 
-# NOTE: Use the variable DT_REPO_PATH to know the absolute path to your code
-# NOTE: Use `dt-exec COMMAND` to run the main process (blocking process)
+# Set up ROS environment
+source /opt/ros/$ROS_DISTRO/setup.bash
+source ${CATKIN_WS_DIR}/devel/setup.bash
 
-# launching app
-dt-exec echo "This is an empty launch script. Update it to launch your application."
-
+# Launch the complete localization and mapping system
+dt-exec roslaunch dbot_odometry all.launch \
+    robot_name:=$ROBOT_NAME \
+    robot_id:=$ROBOT_ID \
+    launch_rviz:=true
 
 # ----------------------------------------------------------------------------
 # YOUR CODE ABOVE THIS LINE

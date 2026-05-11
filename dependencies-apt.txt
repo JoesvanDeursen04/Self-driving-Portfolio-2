@@ -1,1 +1,10 @@
 # LIST YOUR APT PACKAGES HERE
+# OpenCV and computer vision dependencies
+libopencv-dev
+python3-opencv
+
+# ROS visualization and tools
+rviz
+python3-tf
+python3-tf2
+ros-noetic-tf-conversions
