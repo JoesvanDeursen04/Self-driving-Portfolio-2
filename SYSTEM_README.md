@@ -4,11 +4,12 @@ A complete ROS-based autonomous localization and mapping system for Duckiebot th
 
 ## Overview
 
-This system provides real-time pose estimation and environmental mapping for autonomous Duckiebot navigation. It integrates three independent ROS nodes:
+This system provides real-time pose estimation and environmental mapping for autonomous Duckiebot navigation. It integrates four independent ROS nodes:
 
 1. **Odometry Node** - Estimates robot position from wheel encoder data
 2. **SLAM Node** - Detects visual features and estimates camera motion
 3. **Sensor Fusion Node** - Fuses odometry and SLAM measurements using EKF
+4. **Semantic Perception Node** - Detects AprilTags and duckies and maps them as landmarks
 
 ## System Architecture
 
@@ -28,8 +29,12 @@ ROS Nodes
 │   └── Publishes: /slam/camera_motion, /slam/features, /slam/feature_visualization
 │
 └── dbot_sensor_fusion/sensor_fusion_node.py
-    └── Subscribes: /odometry, /slam/camera_motion
-    └── Publishes: /fused_pose, /fused_odometry
+   └── Subscribes: /odometry, /slam/camera_motion
+   └── Publishes: /fused_pose, /fused_odometry
+
+└── dbot_semantics/semantic_perception_node.py
+   └── Subscribes: /fused_pose, /duckiebot/camera/image_raw
+   └── Publishes: /semantic_perception/markers, /semantic_perception/debug_image
 ```
 
 ## Packages
@@ -77,6 +82,19 @@ Extended Kalman Filter for sensor fusion.
 - **Subscribes:** `/odometry` (Odometry), `/slam/camera_motion` (PoseStamped)
 - **Publishes:** `/fused_pose` (PoseStamped), `/fused_odometry` (Odometry)
 
+### dbot_semantics
+Semantic object mapping for AprilTags and duckies.
+
+**Key Features:**
+- AprilTag detection for signs and lights
+- ONNX-based duckie detection using the provided `best.onnx`
+- Landmark projection into the odom frame
+- MarkerArray and overlay visualization for RViz
+
+**Topics:**
+- **Subscribes:** `/fused_pose` (PoseStamped), `/duckiebot/camera/image_raw` (Image)
+- **Publishes:** `/semantic_perception/markers` (MarkerArray), `/semantic_perception/debug_image` (Image)
+
 ## Installation
 
 ### Prerequisites
@@ -120,6 +138,8 @@ Launch the complete localization and mapping system:
 ```bash
 roslaunch dbot_odometry all.launch robot_name:=duckiebot robot_id:=00
 ```
+
+This master launch now starts odometry, SLAM, sensor fusion, and semantic perception together.
 
 ### Launch Individual Components
 
@@ -188,6 +208,10 @@ self.R_vision = np.array([[0.2, 0, 0], ...])
 # Process noise
 self.Q = np.array([[0.01, 0, 0], ...])
 ```
+
+### AprilTag Labels
+
+Edit `packages/dbot_semantics/config/apriltag_semantics.json` to map AprilTag ids to semantic labels such as `stop_sign`, `traffic_light`, or `yield_sign`.
 
 ## Algorithm Details
 
@@ -311,6 +335,13 @@ dbot_localization/
 ├── dbot_sensor_fusion/
 │   ├── src/sensor_fusion_node.py    # EKF implementation
 │   ├── launch/fusion.launch         # Launch configuration
+│   ├── CMakeLists.txt
+│   └── package.xml
+│
+├── dbot_semantics/
+│   ├── src/semantic_perception_node.py  # AprilTag + duckie mapping
+│   ├── launch/semantic_perception.launch
+│   ├── models/best.onnx             # Duckie detector model
 │   ├── CMakeLists.txt
 │   └── package.xml
 │

@@ -2,11 +2,12 @@
 
 ## What's Included
 
-This repository contains a complete autonomous localization and mapping system for Duckiebot composed of three ROS packages:
+This repository contains a complete autonomous localization and mapping system for Duckiebot composed of four ROS packages:
 
 1. **dbot_odometry** - Wheel encoder-based kinematic odometry
 2. **dbot_slam** - Vision-based monocular SLAM with feature tracking
 3. **dbot_sensor_fusion** - Extended Kalman Filter fusion node
+4. **dbot_semantics** - AprilTag and duckie semantic perception node
 
 ## Files Overview
 
@@ -14,12 +15,14 @@ This repository contains a complete autonomous localization and mapping system f
 - `packages/dbot_odometry/src/odometry_node.py` - Differential drive kinematics
 - `packages/dbot_slam/src/slam_node.py` - ORB feature-based SLAM
 - `packages/dbot_sensor_fusion/src/sensor_fusion_node.py` - EKF sensor fusion
+- `packages/dbot_semantics/src/semantic_perception_node.py` - AprilTag and duckie mapping
 
 ### Launch Files
 - `packages/dbot_odometry/launch/all.launch` - Master launch (all components)
 - `packages/dbot_odometry/launch/odometry.launch` - Odometry only
 - `packages/dbot_slam/launch/slam.launch` - SLAM only
 - `packages/dbot_sensor_fusion/launch/fusion.launch` - Fusion only
+- `packages/dbot_semantics/launch/semantic_perception.launch` - Semantic perception only
 
 ### Documentation
 - **TECHNICAL_REPORT.md** (2-3 pages) - Complete system architecture and design
@@ -96,6 +99,10 @@ while not rospy.is_shutdown():
 # Terminal 4: Launch system
 roslaunch dbot_odometry all.launch robot_name:=duckiebot launch_rviz:=true
 ```
+
+This launch now includes semantic perception, so AprilTags and duckies are mapped automatically.
+
+AprilTag labels are configured in `packages/dbot_semantics/config/apriltag_semantics.json`; adjust the ids there if your printed tags use different numbers.
 
 ### Option B: Real Hardware
 

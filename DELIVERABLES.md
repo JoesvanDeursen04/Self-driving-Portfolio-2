@@ -41,6 +41,16 @@ Self-driving-Portfolio-2/
 │           ├── CMakeLists.txt
 │           └── package.xml
 │
+│       └── dbot_semantics/
+│           ├── src/
+│           │   └── semantic_perception_node.py (AprilTag + duckie mapping)
+│           ├── launch/
+│           │   └── semantic_perception.launch
+│           ├── models/
+│           │   └── best.onnx         (Duckie detector model)
+│           ├── CMakeLists.txt
+│           └── package.xml
+│
 ├── 🐳 DOCKER CONFIGURATION
 │   ├── Dockerfile                     (Updated with project info)
 │   ├── launchers/
@@ -61,7 +71,7 @@ Self-driving-Portfolio-2/
 
 ## 📋 Complete File Checklist
 
-### Source Code (1,020 lines total)
+### Source Code (1,350+ lines total)
 - [x] odometry_node.py (290 lines)
   - Differential drive kinematics
   - Encoder data integration
@@ -80,12 +90,18 @@ Self-driving-Portfolio-2/
   - Covariance propagation
   - State estimation
 
-### Launch Files (5 files)
+- [x] semantic_perception_node.py (AprilTag + duckie mapping)
+  - AprilTag detection for fixed infrastructure
+  - ONNX duckie detection and landmark projection
+  - MarkerArray publishing for RViz
+
+### Launch Files (6 files)
 - [x] dbot_odometry/launch/odometry.launch
 - [x] dbot_odometry/launch/all.launch (Master)
 - [x] dbot_slam/launch/slam.launch
 - [x] dbot_sensor_fusion/launch/fusion.launch
 - [x] launchers/default.sh (Docker launcher)
+- [x] dbot_semantics/launch/semantic_perception.launch
 
 ### ROS Configuration (9 files)
 - [x] dbot_odometry/package.xml
@@ -98,7 +114,7 @@ Self-driving-Portfolio-2/
 ### Visualization (1 file)
 - [x] dbot_odometry/rviz/localization.rviz
 
-### Documentation (4 files, 35+ pages, 1,800 lines)
+### Documentation (5 files, 35+ pages, 1,800 lines)
 - [x] TECHNICAL_REPORT.md (8 pages, 450 lines)
   - Executive summary
   - System architecture with diagrams
@@ -131,6 +147,8 @@ Self-driving-Portfolio-2/
   - Configuration templates
   - Troubleshooting
 
+- [x] DELIVERABLES.md (project inventory)
+
 ### Index & Navigation
 - [x] INDEX.md (Complete repository overview)
 
@@ -145,7 +163,8 @@ Self-driving-Portfolio-2/
 - [x] Odometry node with differential drive kinematics
 - [x] SLAM node with vision-based feature tracking
 - [x] Sensor fusion with Extended Kalman Filter
-- [x] Three distinct ROS components
+- [x] Semantic perception with AprilTags and duckie detection
+- [x] Four distinct ROS components
 - [x] ROS topic-based communication
 
 ### 2. Code Quality ✅

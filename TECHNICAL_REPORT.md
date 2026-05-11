@@ -3,13 +3,13 @@
 
 ### Executive Summary
 
-This report documents the design and implementation of an autonomous localization and mapping system for a Duckiebot robot platform. The system combines three independent ROS nodes that collaboratively estimate the robot's pose while building a map of environmental features. The solution integrates odometry estimation from wheel encoders with vision-based SLAM using a monocular camera, fused through an Extended Kalman Filter for robust position tracking.
+This report documents the design and implementation of an autonomous localization and mapping system for a Duckiebot robot platform. The system combines four independent ROS nodes that collaboratively estimate the robot's pose while building a map of environmental features. The solution integrates odometry estimation from wheel encoders with vision-based SLAM using a monocular camera, fused through an Extended Kalman Filter for robust position tracking, and a semantic perception layer that maps AprilTags and duckie detections.
 
 ### 1. System Architecture
 
 #### 1.1 Overview
 
-The system consists of three main ROS packages communicating through standardized ROS topics:
+The system consists of four main ROS packages communicating through standardized ROS topics:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -49,6 +49,8 @@ The system consists of three main ROS packages communicating through standardize
               └──────────────────┘
 ```
 
+The semantic perception node runs alongside this geometric stack and publishes AprilTag and duckie landmarks into the same odom-referenced world model.
+
 #### 1.2 Component Responsibilities
 
 **Odometry Node (dbot_odometry)**
@@ -72,6 +74,12 @@ The system consists of three main ROS packages communicating through standardize
 - Manages measurement and process noise covariances
 - Publishes fused pose estimate and uncertainty bounds
 - Provides ground truth for navigation subsystems
+
+**Semantic Perception Node (dbot_semantics)**
+- Detects AprilTags for fixed infrastructure such as signs and lights
+- Runs an ONNX-based duckie detector for semantic object landmarks
+- Projects detections into the odom frame using the fused pose estimate
+- Publishes landmark markers and a debug image stream for live visualization
 
 ### 2. Implementation Details
 
@@ -182,6 +190,25 @@ $$\mathbf{Q} = \text{diag}(0.01, 0.01, 0.01)$$
 - No explicit motion command input (passive fusion only)
 - Scalable to higher-dimensional state if extended
 
+#### 2.4 Semantic Perception
+
+The semantic perception node adds an object-aware mapping layer on top of the geometric localization stack.
+
+**AprilTag Detection:**
+- Uses OpenCV's AprilTag support to detect tags placed on signs and lights
+- Estimates pose from tag corners using `cv2.solvePnP()`
+- Converts each tag into a stable semantic landmark in the odom frame
+
+**Duckie Detection:**
+- Loads the provided `best.onnx` model with OpenCV DNN
+- Detects duckies as semantic object landmarks
+- Estimates range from the detection box height using a pinhole camera approximation
+
+**Map Integration:**
+- Landmarks are tracked in a persistent dictionary keyed by type and label
+- Detections are published as `MarkerArray` messages for RViz
+- A debug image topic overlays tags, boxes, and labels for live verification
+
 ### 3. ROS Topic Structure
 
 | Topic | Type | Node Source | Description |
@@ -196,6 +223,8 @@ $$\mathbf{Q} = \text{diag}(0.01, 0.01, 0.01)$$
 | `/slam/feature_visualization` | Image | SLAM Node | Feature tracking visualization |
 | `/fused_pose` | PoseStamped | Fusion Node | Final pose estimate |
 | `/fused_odometry` | Odometry | Fusion Node | Fused pose with covariance |
+| `/semantic_perception/markers` | MarkerArray | Semantic Perception Node | Semantic landmarks in RViz |
+| `/semantic_perception/debug_image` | Image | Semantic Perception Node | Duckie and AprilTag overlay image |
 
 ### 4. Design Choices and Trade-offs
 

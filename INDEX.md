@@ -39,6 +39,13 @@ Self-driving-Portfolio-2/
 │       ├── launch/fusion.launch
 │       ├── CMakeLists.txt
 │       └── package.xml
+│   │
+│   └── dbot_semantics/
+│       ├── src/semantic_perception_node.py ← AprilTag + duckie mapping
+│       ├── launch/semantic_perception.launch
+│       ├── models/best.onnx             ← Duckie detector model
+│       ├── CMakeLists.txt
+│       └── package.xml
 │
 ├── launchers/
 │   └── default.sh                      ← Docker launcher
@@ -100,6 +107,13 @@ rviz -d $(rospack find dbot_odometry)/rviz/localization.rviz
 - Implements: 3-state Extended Kalman Filter
 - State: [x, y, θ]
 - Update Rate: 30 Hz
+
+**4. Semantic Perception Node** (`dbot_semantics`)
+- Subscribes: `/fused_pose` (PoseStamped), `/duckiebot/camera/image_raw` (Image)
+- Publishes: `/semantic_perception/markers` (MarkerArray), `/semantic_perception/debug_image` (Image)
+- Implements: AprilTag detection and ONNX duckie detection
+- Maps: fixed signs/lights and duckie landmarks
+- Update Rate: event-driven
 
 ### Data Flow
 ```
@@ -229,6 +243,8 @@ See [TECHNICAL_REPORT.md](TECHNICAL_REPORT.md#limitations-and-failure-scenarios)
 | `/slam/feature_visualization` | Image | dbot_slam | ~15 Hz |
 | `/fused_pose` | PoseStamped | dbot_sensor_fusion | 30 Hz |
 | `/fused_odometry` | Odometry | dbot_sensor_fusion | 30 Hz |
+| `/semantic_perception/markers` | MarkerArray | dbot_semantics | event-driven |
+| `/semantic_perception/debug_image` | Image | dbot_semantics | event-driven |
 
 ### TF Frames
 - `/odom` - Odometry reference frame
@@ -269,7 +285,7 @@ See [SYSTEM_README.md#debugging](SYSTEM_README.md#debugging) for more troublesho
 
 ## 📄 Deliverables Checklist
 
-✅ **Source Code**: 3 complete ROS packages with clear structure
+✅ **Source Code**: 4 complete ROS packages with clear structure
 ✅ **Odometry Node**: Differential drive kinematics implementation
 ✅ **SLAM Node**: Vision-based feature tracking implementation
 ✅ **Sensor Fusion**: EKF implementation combining both modalities

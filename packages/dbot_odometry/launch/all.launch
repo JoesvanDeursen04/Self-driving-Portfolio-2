@@ -24,6 +24,12 @@
         <include file="$(find dbot_sensor_fusion)/launch/fusion.launch">
             <arg name="robot_name" value="$(arg robot_name)"/>
         </include>
+
+        <!-- ========== Semantic Perception Node ========== -->
+        <!-- Detects AprilTags and duckies and maps them as semantic landmarks -->
+        <include file="$(find dbot_semantics)/launch/semantic_perception.launch">
+            <arg name="robot_name" value="$(arg robot_name)"/>
+        </include>
     </group>
     
     <!-- Optional: Launch RViz for visualization -->

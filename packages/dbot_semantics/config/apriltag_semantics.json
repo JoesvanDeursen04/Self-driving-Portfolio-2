@@ -1,0 +1,10 @@
+{
+  "0": "stop_sign",
+  "1": "traffic_light",
+  "2": "yield_sign",
+  "3": "speed_limit",
+  "4": "no_entry",
+  "5": "parking_sign",
+  "6": "crossing_sign",
+  "7": "warning_sign"
+}
