@@ -1,7 +1,7 @@
 # parameters
-ARG REPO_NAME="dbot-localization"
-ARG DESCRIPTION="Duckiebot Localization and Mapping System with Odometry, SLAM, and Sensor Fusion"
-ARG MAINTAINER="Autonomous Robotics Team (team@duckietown.org)"
+ARG REPO_NAME="Self-driving-Portfolio-2"
+ARG DESCRIPTION=""
+ARG MAINTAINER="Joes van Deursen"
 # pick an icon from: https://fontawesome.com/v4.7.0/icons/
 ARG ICON="cube"
 
