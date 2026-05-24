@@ -180,10 +180,10 @@ class SLAMNode:
                 ]).reshape(-1, 1, 2)
                 
                 # Estimate fundamental matrix
-                F, mask = cv2.findFundamentalMatrix(src_pts, dst_pts, cv2.FM_RANSAC)
+                F, mask = cv2.findFundamentalMat(src_pts, dst_pts, cv2.FM_RANSAC)
                 
                 # Estimate essential matrix
-                if F is not None:
+                if F is not None and F.shape == (3, 3):
                     E = self.camera_matrix.T @ F @ self.camera_matrix
                     
                     # Decompose essential matrix
