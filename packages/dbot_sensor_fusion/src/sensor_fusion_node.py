@@ -22,6 +22,7 @@ import math
 import tf.transformations as tf_trans
 from scipy.spatial.transform import Rotation as R
 import threading
+from duckietown.dtros import DTROS, NodeType
 
 
 class ExtendedKalmanFilter:
@@ -152,7 +153,7 @@ class ExtendedKalmanFilter:
         return angle
 
 
-class SensorFusionNode:
+class SensorFusionNode(DTROS):
     """
     Sensor Fusion node combining odometry and SLAM.
     Uses Extended Kalman Filter for robust pose estimation.
@@ -160,7 +161,7 @@ class SensorFusionNode:
     
     def __init__(self):
         """Initialize sensor fusion node with EKF."""
-        rospy.init_node('sensor_fusion_node', anonymous=False)
+        super(SensorFusionNode, self).__init__(node_name='sensor_fusion_node', node_type=NodeType.LOCALIZATION)
         
         # Robot parameters
         self.robot_name = rospy.get_param('~robot_name', 'duckiebot')

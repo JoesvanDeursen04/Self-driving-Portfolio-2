@@ -26,6 +26,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 import tf.transformations as tf_trans
+from duckietown.dtros import DTROS, NodeType
 
 
 @dataclass
@@ -37,9 +38,9 @@ class LandmarkObservation:
     confidence: float
 
 
-class SemanticPerceptionNode:
+class SemanticPerceptionNode(DTROS):
     def __init__(self):
-        rospy.init_node('semantic_perception_node', anonymous=False)
+        super(SemanticPerceptionNode, self).__init__(node_name='semantic_perception_node', node_type=NodeType.PERCEPTION)
 
         self.robot_name = rospy.get_param('~robot_name', 'duckiebot')
         self.camera_topic = rospy.get_param('~camera_topic', f'/{self.robot_name}/camera/image_raw')

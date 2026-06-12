@@ -22,9 +22,10 @@ import tf
 import tf2_ros as tf2
 import math
 import numpy as np
+from duckietown.dtros import DTROS, NodeType
 
 
-class OdometryNode:
+class OdometryNode(DTROS):
     """
     Odometry estimation node for differential drive robot.
     
@@ -34,7 +35,7 @@ class OdometryNode:
     
     def __init__(self):
         """Initialize odometry node with parameters and subscribers."""
-        rospy.init_node('odometry_node', anonymous=False)
+        super(OdometryNode, self).__init__(node_name='odometry_node', node_type=NodeType.LOCALIZATION)
         
         # Get robot name
         self.robot_name = rospy.get_param('~robot_name', 'duckiebot')

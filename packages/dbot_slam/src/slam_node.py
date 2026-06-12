@@ -23,9 +23,10 @@ import numpy as np
 import math
 import tf.transformations as tf_trans
 from collections import deque
+from duckietown.dtros import DTROS, NodeType
 
 
-class SLAMNode:
+class SLAMNode(DTROS):
     """
     Vision-based monocular SLAM node for Duckiebot.
     
@@ -35,7 +36,7 @@ class SLAMNode:
     
     def __init__(self):
         """Initialize SLAM node with feature detector and tracker."""
-        rospy.init_node('slam_node', anonymous=False)
+        super(SLAMNode, self).__init__(node_name='slam_node', node_type=NodeType.PERCEPTION)
         
         # Robot and frame parameters
         self.robot_name = rospy.get_param('~robot_name', 'duckiebot')
