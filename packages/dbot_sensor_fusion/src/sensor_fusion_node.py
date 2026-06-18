@@ -338,11 +338,13 @@ class SensorFusionNode(DTROS):
                 # Update with odometry if available
                 if self.odom_buffer is not None:
                     self.ekf.update_odometry(self.odom_buffer)
+                    self.odom_buffer = None
                     rospy.logdebug("Odometry update applied")
                 
                 # Update with vision if available
                 if self.vision_buffer is not None:
                     self.ekf.update_vision(self.vision_buffer)
+                    self.vision_buffer = None
                     rospy.logdebug("Vision update applied")
                 
                 # Publish fused estimates

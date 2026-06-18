@@ -36,8 +36,8 @@
         </include>
     </group>
     
-    <!-- Optional: Launch RViz for visualization -->
-    <arg name="launch_rviz" default="true"/>
+    <!-- Optional: Launch RViz for visualization (disable on physical robot: no display) -->
+    <arg name="launch_rviz" default="false"/>
     <node if="$(arg launch_rviz)" name="rviz" pkg="rviz" type="rviz" 
           args="-d $(find dbot_odometry)/rviz/localization.rviz"
           output="screen">
