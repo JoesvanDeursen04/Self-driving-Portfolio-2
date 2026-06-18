@@ -85,9 +85,9 @@ class DuckiebotSimulator:
         self.world = build_world()
 
         self.left_pub  = rospy.Publisher(
-            f'/{self.robot_name}/left_wheel_encoder/tick',  WheelEncoderStamped, queue_size=10)
+            f'/{self.robot_name}/left_wheel_encoder_node/tick',  WheelEncoderStamped, queue_size=10)
         self.right_pub = rospy.Publisher(
-            f'/{self.robot_name}/right_wheel_encoder/tick', WheelEncoderStamped, queue_size=10)
+            f'/{self.robot_name}/right_wheel_encoder_node/tick', WheelEncoderStamped, queue_size=10)
         self.cam_pub   = rospy.Publisher(
             f'/{self.robot_name}/camera/image_raw',    Image, queue_size=10)
 
@@ -134,14 +134,14 @@ class DuckiebotSimulator:
         left_msg.header.stamp = now
         left_msg.data = self.left_ticks
         left_msg.resolution = self.ticks_per_rev
-        left_msg.type = WheelEncoderStamped.TYPE_ABSOLUTE
+        left_msg.type = WheelEncoderStamped.ENCODER_TYPE_INCREMENTAL
         self.left_pub.publish(left_msg)
 
         right_msg = WheelEncoderStamped()
         right_msg.header.stamp = now
         right_msg.data = self.right_ticks
         right_msg.resolution = self.ticks_per_rev
-        right_msg.type = WheelEncoderStamped.TYPE_ABSOLUTE
+        right_msg.type = WheelEncoderStamped.ENCODER_TYPE_INCREMENTAL
         self.right_pub.publish(right_msg)
 
         img_msg = self.bridge.cv2_to_imgmsg(self._camera_frame(), encoding='bgr8')

@@ -7,8 +7,8 @@ Implements differential drive kinematic model.
 
 Topics:
     Subscribes:
-        - /{robot_name}/left_wheel_encoder/tick (WheelEncoderStamped) - e.g., /duckiebot/left_wheel_encoder/tick
-        - /{robot_name}/right_wheel_encoder/tick (WheelEncoderStamped) - e.g., /duckiebot/right_wheel_encoder/tick
+        - /{robot_name}/left_wheel_encoder_node/tick (WheelEncoderStamped)
+        - /{robot_name}/right_wheel_encoder_node/tick (WheelEncoderStamped)
     Publishes:
         - /odometry (Odometry)
         - /pose (PoseStamped)
@@ -72,14 +72,15 @@ class OdometryNode(DTROS):
         self.pose_pub = rospy.Publisher('/pose', PoseStamped, queue_size=10)
         
         # Subscribers
-        # Real Duckiebot publishes WheelEncoderStamped on .../{side}_wheel_encoder/tick
+        # Real Duckiebot: dt-duckiebot-interface launches the encoder nodes as
+        # left_wheel_encoder_node and right_wheel_encoder_node, publishing on ~tick
         rospy.Subscriber(
-            f'/{self.robot_name}/left_wheel_encoder/tick',
+            f'/{self.robot_name}/left_wheel_encoder_node/tick',
             WheelEncoderStamped,
             self.left_encoder_callback
         )
         rospy.Subscriber(
-            f'/{self.robot_name}/right_wheel_encoder/tick',
+            f'/{self.robot_name}/right_wheel_encoder_node/tick',
             WheelEncoderStamped,
             self.right_encoder_callback
         )
