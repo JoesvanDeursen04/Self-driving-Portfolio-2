@@ -211,7 +211,8 @@ class SLAMNode(DTROS):
                         good_matches.append(m)
             
             # Extract matched feature points
-            if good_matches:
+            # cv2.findFundamentalMat needs at least 8 point correspondences
+            if len(good_matches) >= 8:
                 src_pts = np.float32([
                     self.prev_features[0][m.queryIdx].pt for m in good_matches
                 ]).reshape(-1, 1, 2)
@@ -246,9 +247,8 @@ class SLAMNode(DTROS):
                                 'last_seen': timestamp.to_sec()
                             }
                         else:
-                            self.feature_map[feature_id]['positions'].append(
-                                keypoints[m.trainIdx].pt
-                            )
+                            # Overwrite instead of append to prevent unbounded memory growth
+                            self.feature_map[feature_id]['positions'] = [keypoints[m.trainIdx].pt]
                             self.feature_map[feature_id]['last_seen'] = timestamp.to_sec()
             
             # Draw matches on visualization

@@ -20,7 +20,7 @@ source ${CATKIN_WS_DIR}/devel/setup.bash
 dt-exec roslaunch dbot_odometry all.launch \
     robot_name:=$ROBOT_NAME \
     robot_id:=$ROBOT_ID \
-    launch_rviz:=true
+    launch_rviz:=false
 
 # ----------------------------------------------------------------------------
 # YOUR CODE ABOVE THIS LINE
