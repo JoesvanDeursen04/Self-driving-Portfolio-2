@@ -14,7 +14,7 @@ Topics:
 """
 
 import rospy
-from sensor_msgs.msg import Image, PointCloud2, PointField
+from sensor_msgs.msg import Image, PointCloud2, PointField, CompressedImage, CameraInfo
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from std_msgs.msg import Header
 from cv_bridge import CvBridge
@@ -106,15 +106,54 @@ class SLAMNode(DTROS):
             queue_size=10
         )
         
-        # Subscriber
-        rospy.Subscriber(
-            f'/{self.robot_name}/camera/image_raw',
-            Image,
-            self.image_callback
+        # Whether to subscribe to compressed images (real Duckiebot) or raw (simulator)
+        self.use_compressed = rospy.get_param('~use_compressed', True)
+        camera_topic_default = (
+            f'/{self.robot_name}/camera_node/image/compressed'
+            if self.use_compressed
+            else f'/{self.robot_name}/camera/image_raw'
         )
-        
+        self.camera_topic = rospy.get_param('~camera_topic', camera_topic_default)
+
+        # Subscribe to camera calibration; hardcoded values above are used as fallback
+        rospy.Subscriber(
+            f'/{self.robot_name}/camera_node/camera_info',
+            CameraInfo,
+            self.camera_info_callback
+        )
+
+        # Subscribe to camera images
+        if self.use_compressed:
+            rospy.Subscriber(self.camera_topic, CompressedImage, self.compressed_image_callback)
+        else:
+            rospy.Subscriber(self.camera_topic, Image, self.image_callback)
+
         rospy.loginfo(f"SLAM node initialized for {self.robot_name}")
+        rospy.loginfo(f"Camera topic: {self.camera_topic} (compressed={self.use_compressed})")
         
+    def camera_info_callback(self, msg):
+        """Update camera calibration matrix from camera_info topic."""
+        if msg.K[0] > 0:
+            self.camera_matrix = np.array(msg.K, dtype=np.float32).reshape(3, 3)
+            self.dist_coeffs = np.array(msg.D, dtype=np.float32).reshape(-1, 1)
+            self.fx = float(self.camera_matrix[0, 0])
+            self.fy = float(self.camera_matrix[1, 1])
+            self.cx = float(self.camera_matrix[0, 2])
+            self.cy = float(self.camera_matrix[1, 2])
+
+    def compressed_image_callback(self, msg):
+        """Decode a CompressedImage from the real Duckiebot camera and process it."""
+        try:
+            np_arr = np.frombuffer(msg.data, np.uint8)
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            if frame is None:
+                rospy.logwarn_throttle(5.0, "SLAM: failed to decode compressed image")
+                return
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            self.process_frame(frame, gray, msg.header.stamp)
+        except Exception as e:
+            rospy.logwarn(f"Error processing compressed image: {e}")
+
     def image_callback(self, msg):
         """
         Process camera image for feature detection and tracking.

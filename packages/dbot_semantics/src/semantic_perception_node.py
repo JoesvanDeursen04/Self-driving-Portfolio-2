@@ -22,7 +22,7 @@ import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from geometry_msgs.msg import PoseStamped, Quaternion
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage, CameraInfo
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 import tf.transformations as tf_trans
@@ -43,7 +43,13 @@ class SemanticPerceptionNode(DTROS):
         super(SemanticPerceptionNode, self).__init__(node_name='semantic_perception_node', node_type=NodeType.PERCEPTION)
 
         self.robot_name = rospy.get_param('~robot_name', 'duckiebot')
-        self.camera_topic = rospy.get_param('~camera_topic', f'/{self.robot_name}/camera/image_raw')
+        self.use_compressed = rospy.get_param('~use_compressed', True)
+        camera_topic_default = (
+            f'/{self.robot_name}/camera_node/image/compressed'
+            if self.use_compressed
+            else f'/{self.robot_name}/camera/image_raw'
+        )
+        self.camera_topic = rospy.get_param('~camera_topic', camera_topic_default)
         self.pose_topic = rospy.get_param('~pose_topic', '/fused_pose')
         self.camera_frame = rospy.get_param('~camera_frame', f'{self.robot_name}/camera')
         package_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,10 +83,21 @@ class SemanticPerceptionNode(DTROS):
         self.marker_pub = rospy.Publisher('/semantic_perception/markers', MarkerArray, queue_size=10)
         self.debug_pub = rospy.Publisher('/semantic_perception/debug_image', Image, queue_size=10)
 
-        rospy.Subscriber(self.camera_topic, Image, self.image_callback, queue_size=1)
+        # Subscribe to camera calibration; hardcoded values above are used as fallback
+        rospy.Subscriber(
+            f'/{self.robot_name}/camera_node/camera_info',
+            CameraInfo,
+            self.camera_info_callback
+        )
+
+        # Subscribe to camera images (compressed for real hardware, raw for simulator)
+        if self.use_compressed:
+            rospy.Subscriber(self.camera_topic, CompressedImage, self.compressed_image_callback, queue_size=1)
+        else:
+            rospy.Subscriber(self.camera_topic, Image, self.image_callback, queue_size=1)
         rospy.Subscriber(self.pose_topic, PoseStamped, self.pose_callback, queue_size=1)
 
-        rospy.loginfo('Semantic perception node ready with model: %s', self.model_path)
+        rospy.loginfo('Semantic perception node ready. Camera: %s (compressed=%s)', self.camera_topic, self.use_compressed)
 
     def _load_model(self, model_path):
         if not os.path.exists(model_path):
@@ -139,6 +156,28 @@ class SemanticPerceptionNode(DTROS):
             return aruco.DetectorParameters()
         return None
 
+    def camera_info_callback(self, msg):
+        """Update camera calibration matrix from camera_info topic."""
+        if msg.K[0] > 0:
+            self.camera_matrix = np.array(msg.K, dtype=np.float32).reshape(3, 3)
+            self.dist_coeffs = np.array(msg.D, dtype=np.float32).reshape(-1, 1)
+            self.fx = float(self.camera_matrix[0, 0])
+            self.fy = float(self.camera_matrix[1, 1])
+            self.cx = float(self.camera_matrix[0, 2])
+            self.cy = float(self.camera_matrix[1, 2])
+
+    def compressed_image_callback(self, msg):
+        """Decode a CompressedImage from the real Duckiebot camera and process it."""
+        try:
+            np_arr = np.frombuffer(msg.data, np.uint8)
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            if frame is None:
+                rospy.logwarn_throttle(5.0, "Semantic: failed to decode compressed image")
+                return
+            self._process_frame(frame, msg.header.stamp)
+        except Exception as exc:
+            rospy.logwarn('Could not decode compressed image: %s', exc)
+
     def pose_callback(self, msg):
         self.current_pose = msg
 
@@ -148,7 +187,9 @@ class SemanticPerceptionNode(DTROS):
         except Exception as exc:
             rospy.logwarn('Could not convert camera image: %s', exc)
             return
+        self._process_frame(frame, msg.header.stamp)
 
+    def _process_frame(self, frame, stamp):
         observations = []
         debug = frame.copy()
 
@@ -156,8 +197,8 @@ class SemanticPerceptionNode(DTROS):
         observations.extend(self._detect_duckies(frame, debug))
 
         self._integrate_observations(observations)
-        self._publish_markers(msg.header.stamp)
-        self._publish_debug_image(debug, msg.header.stamp)
+        self._publish_markers(stamp)
+        self._publish_debug_image(debug, stamp)
         self.frame_index += 1
 
     def _detect_apriltags(self, frame, debug):

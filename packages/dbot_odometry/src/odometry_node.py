@@ -7,8 +7,8 @@ Implements differential drive kinematic model.
 
 Topics:
     Subscribes:
-        - /{robot_name}/left_wheel_encoder (Int32) - e.g., /duckiebot/left_wheel_encoder
-        - /{robot_name}/right_wheel_encoder (Int32) - e.g., /duckiebot/right_wheel_encoder
+        - /{robot_name}/left_wheel_encoder/tick (WheelEncoderStamped) - e.g., /duckiebot/left_wheel_encoder/tick
+        - /{robot_name}/right_wheel_encoder/tick (WheelEncoderStamped) - e.g., /duckiebot/right_wheel_encoder/tick
     Publishes:
         - /odometry (Odometry)
         - /pose (PoseStamped)
@@ -17,7 +17,7 @@ Topics:
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist, Point, Quaternion
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Int32
+from duckietown_msgs.msg import WheelEncoderStamped
 import tf
 import tf2_ros as tf2
 import math
@@ -72,14 +72,15 @@ class OdometryNode(DTROS):
         self.pose_pub = rospy.Publisher('/pose', PoseStamped, queue_size=10)
         
         # Subscribers
+        # Real Duckiebot publishes WheelEncoderStamped on .../{side}_wheel_encoder/tick
         rospy.Subscriber(
-            f'/{self.robot_name}/left_wheel_encoder',
-            Int32,
+            f'/{self.robot_name}/left_wheel_encoder/tick',
+            WheelEncoderStamped,
             self.left_encoder_callback
         )
         rospy.Subscriber(
-            f'/{self.robot_name}/right_wheel_encoder',
-            Int32,
+            f'/{self.robot_name}/right_wheel_encoder/tick',
+            WheelEncoderStamped,
             self.right_encoder_callback
         )
         
@@ -92,18 +93,22 @@ class OdometryNode(DTROS):
         Callback for left wheel encoder data.
         
         Args:
-            msg: Int32 message containing encoder tick count
+            msg: WheelEncoderStamped message containing cumulative tick count
         """
         self.left_encoder_count = msg.data
+        if msg.resolution > 0:
+            self.encoder_ticks_per_revolution = msg.resolution
         
     def right_encoder_callback(self, msg):
         """
         Callback for right wheel encoder data.
         
         Args:
-            msg: Int32 message containing encoder tick count
+            msg: WheelEncoderStamped message containing cumulative tick count
         """
         self.right_encoder_count = msg.data
+        if msg.resolution > 0:
+            self.encoder_ticks_per_revolution = msg.resolution
         
     def encoder_ticks_to_distance(self, ticks):
         """

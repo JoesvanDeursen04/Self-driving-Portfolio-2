@@ -10,7 +10,7 @@ Gebruik:
 """
 
 import rospy
-from std_msgs.msg import Int32
+from duckietown_msgs.msg import WheelEncoderStamped
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
@@ -85,9 +85,9 @@ class DuckiebotSimulator:
         self.world = build_world()
 
         self.left_pub  = rospy.Publisher(
-            f'/{self.robot_name}/left_wheel_encoder',  Int32, queue_size=10)
+            f'/{self.robot_name}/left_wheel_encoder/tick',  WheelEncoderStamped, queue_size=10)
         self.right_pub = rospy.Publisher(
-            f'/{self.robot_name}/right_wheel_encoder', Int32, queue_size=10)
+            f'/{self.robot_name}/right_wheel_encoder/tick', WheelEncoderStamped, queue_size=10)
         self.cam_pub   = rospy.Publisher(
             f'/{self.robot_name}/camera/image_raw',    Image, queue_size=10)
 
@@ -130,8 +130,19 @@ class DuckiebotSimulator:
         self.wy    += dist * math.sin(self.theta) * SCALE
 
         now = rospy.Time.now()
-        self.left_pub.publish(Int32(self.left_ticks))
-        self.right_pub.publish(Int32(self.right_ticks))
+        left_msg = WheelEncoderStamped()
+        left_msg.header.stamp = now
+        left_msg.data = self.left_ticks
+        left_msg.resolution = self.ticks_per_rev
+        left_msg.type = WheelEncoderStamped.TYPE_ABSOLUTE
+        self.left_pub.publish(left_msg)
+
+        right_msg = WheelEncoderStamped()
+        right_msg.header.stamp = now
+        right_msg.data = self.right_ticks
+        right_msg.resolution = self.ticks_per_rev
+        right_msg.type = WheelEncoderStamped.TYPE_ABSOLUTE
+        self.right_pub.publish(right_msg)
 
         img_msg = self.bridge.cv2_to_imgmsg(self._camera_frame(), encoding='bgr8')
         img_msg.header.stamp = now

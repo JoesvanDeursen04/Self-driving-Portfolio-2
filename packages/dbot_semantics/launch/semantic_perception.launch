@@ -3,22 +3,28 @@
     <arg name="robot_name" default="duckiebot"/>
     <arg name="model_path" default="$(find dbot_semantics)/models/best.onnx"/>
     <arg name="tag_semantics_file" default="$(find dbot_semantics)/config/apriltag_semantics.json"/>
+    <!-- Set to true for real Duckiebot (compressed camera), false for simulator (raw) -->
+    <arg name="use_compressed" default="true"/>
 
     <node name="semantic_perception_node" pkg="dbot_semantics" type="semantic_perception_node.py" output="screen">
         <param name="robot_name" value="$(arg robot_name)"/>
         <param name="model_path" value="$(arg model_path)"/>
         <param name="tag_semantics_file" value="$(arg tag_semantics_file)"/>
         <param name="camera_frame" value="$(arg robot_name)/camera"/>
-        <param name="camera_topic" value="/$(arg robot_name)/camera/image_raw"/>
         <param name="pose_topic" value="/fused_pose"/>
         <param name="duckie_class_name" value="duckie"/>
         <param name="duckie_real_height_m" value="0.15"/>
         <param name="duckie_score_threshold" value="0.35"/>
         <param name="duckie_nms_threshold" value="0.4"/>
         <param name="tag_size_m" value="0.08"/>
+        <!-- Camera calibration fallback (camera_info topic takes priority) -->
         <param name="fx" value="183"/>
         <param name="fy" value="183"/>
         <param name="cx" value="160"/>
         <param name="cy" value="120"/>
+        <!-- Image transport mode -->
+        <param name="use_compressed" value="$(arg use_compressed)"/>
+        <param name="camera_topic" value="/$(arg robot_name)/camera_node/image/compressed" if="$(arg use_compressed)"/>
+        <param name="camera_topic" value="/$(arg robot_name)/camera/image_raw" unless="$(arg use_compressed)"/>
     </node>
 </launch>

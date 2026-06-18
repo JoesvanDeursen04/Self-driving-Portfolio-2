@@ -5,6 +5,8 @@
     
     <!-- Robot name -->
     <arg name="robot_name" default="duckiebot"/>
+    <!-- Set to true for real Duckiebot (compressed camera), false for simulator -->
+    <arg name="use_compressed" default="true"/>
     
     <group ns="$(arg robot_name)">
         <!-- ========== Odometry Node ========== -->
@@ -17,6 +19,7 @@
         <!-- Detects and tracks visual features from camera -->
         <include file="$(find dbot_slam)/launch/slam.launch">
             <arg name="robot_name" value="$(arg robot_name)"/>
+            <arg name="use_compressed" value="$(arg use_compressed)"/>
         </include>
         
         <!-- ========== Sensor Fusion Node ========== -->
@@ -29,6 +32,7 @@
         <!-- Detects AprilTags and duckies and maps them as semantic landmarks -->
         <include file="$(find dbot_semantics)/launch/semantic_perception.launch">
             <arg name="robot_name" value="$(arg robot_name)"/>
+            <arg name="use_compressed" value="$(arg use_compressed)"/>
         </include>
     </group>
     
