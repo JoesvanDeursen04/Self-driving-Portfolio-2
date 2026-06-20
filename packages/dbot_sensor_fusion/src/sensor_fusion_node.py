@@ -146,15 +146,26 @@ class ExtendedKalmanFilter:
         # Update covariance
         self.P = (np.eye(3) - K) @ self.P
 
-    def update_vision_delta(self, delta_vision):
+    def update_vision_delta(self, delta_vision, reference_yaw=0.0, rotate_delta_to_world=True):
         """
         Update state with relative vision increment instead of absolute pose.
 
         Args:
             delta_vision: Increment [dx, dy, dtheta]
+            reference_yaw: Current global yaw used for body->world rotation
+            rotate_delta_to_world: Whether dx/dy should be rotated by reference yaw
         """
+        if rotate_delta_to_world:
+            dx_local = float(delta_vision[0])
+            dy_local = float(delta_vision[1])
+            dx_world = (dx_local * math.cos(reference_yaw)) - (dy_local * math.sin(reference_yaw))
+            dy_world = (dx_local * math.sin(reference_yaw)) + (dy_local * math.cos(reference_yaw))
+            delta_used = np.array([dx_world, dy_world, float(delta_vision[2])])
+        else:
+            delta_used = delta_vision
+
         # Turn relative motion into a proposal around current state.
-        z = self.x + delta_vision
+        z = self.x + delta_used
         z[2] = self._normalize_angle(z[2])
 
         y = z - self.x
@@ -221,6 +232,7 @@ class SensorFusionNode(DTROS):
         self.max_linear_speed = rospy.get_param('~max_linear_speed', 1.0)
         self.max_angular_speed = rospy.get_param('~max_angular_speed', 6.0)
         self.use_odom_measurement_update = rospy.get_param('~use_odom_measurement_update', False)
+        self.rotate_vision_delta_to_world = rospy.get_param('~rotate_vision_delta_to_world', True)
 
         # Vision reset/outlier guards
         self.vision_reset_near_zero_m = rospy.get_param('~vision_reset_near_zero_m', 0.1)
@@ -444,7 +456,12 @@ class SensorFusionNode(DTROS):
                 
                 # Update with vision if available
                 if self.vision_delta_buffer is not None:
-                    self.ekf.update_vision_delta(self.vision_delta_buffer)
+                    current_yaw = self.ekf.get_pose()[2]
+                    self.ekf.update_vision_delta(
+                        self.vision_delta_buffer,
+                        reference_yaw=current_yaw,
+                        rotate_delta_to_world=self.rotate_vision_delta_to_world
+                    )
                     self.vision_delta_buffer = None
                     rospy.logdebug("Vision update applied")
                 

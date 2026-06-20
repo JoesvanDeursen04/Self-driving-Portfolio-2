@@ -28,6 +28,8 @@
         <param name="motion_epsilon_m" value="0.002"/>
         <param name="odom_stale_timeout_s" value="0.2"/>
         <param name="max_visual_scale_m" value="0.1"/>
+        <param name="camera_offset_x_m" value="0.06"/>
+        <param name="camera_offset_y_m" value="0.0"/>
         <param name="odom_frame" value="odom"/>
     </node>
 

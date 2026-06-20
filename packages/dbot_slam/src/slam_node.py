@@ -59,12 +59,15 @@ class SLAMNode(DTROS):
         self.frame_count = 0
         self.feature_map = {}  # 3D map of features
         self.feature_id_counter = 0
+        self.prev_feature_ids = None
         self.last_keyframe_pose = np.eye(4)
         self.translation_scale = rospy.get_param('~translation_scale', 0.03)  # fallback meters per frame
         self.motion_epsilon_m = rospy.get_param('~motion_epsilon_m', 0.002)
         self.odom_stale_timeout_s = rospy.get_param('~odom_stale_timeout_s', 0.2)
         self.use_odom_for_scale = rospy.get_param('~use_odom_for_scale', True)
         self.max_visual_scale_m = rospy.get_param('~max_visual_scale_m', 0.1)
+        self.camera_offset_x_m = rospy.get_param('~camera_offset_x_m', 0.06)
+        self.camera_offset_y_m = rospy.get_param('~camera_offset_y_m', 0.0)
 
         # Odom state for dynamic visual scale
         self.lock = threading.Lock()
@@ -235,11 +238,20 @@ class SLAMNode(DTROS):
             # First frame - initialize tracking
             self.prev_gray = gray
             self.prev_features = (keypoints, descriptors)
+            self.prev_feature_ids = [self._next_feature_id() for _ in range(len(keypoints))]
+            for idx, feature_id in enumerate(self.prev_feature_ids):
+                descriptor = descriptors[idx] if descriptors is not None else None
+                self.feature_map[feature_id] = {
+                    'positions': [keypoints[idx].pt],
+                    'descriptors': descriptor,
+                    'last_seen': timestamp.to_sec()
+                }
             self.frame_count = 0
             rospy.loginfo("SLAM: First frame processed, starting feature tracking")
             return
             
         # Match features between frames
+        current_feature_ids = [None] * len(keypoints)
         if descriptors is not None and self.prev_features[1] is not None:
             matches = self.bf_matcher.knnMatch(
                 self.prev_features[1],
@@ -254,6 +266,22 @@ class SLAMNode(DTROS):
                     m, n = match_pair
                     if m.distance < 0.7 * n.distance:
                         good_matches.append(m)
+
+            # Propagate stable feature IDs through descriptor matches.
+            for m in good_matches:
+                prev_id = None
+                if self.prev_feature_ids is not None and m.queryIdx < len(self.prev_feature_ids):
+                    prev_id = self.prev_feature_ids[m.queryIdx]
+                if prev_id is None:
+                    prev_id = self._next_feature_id()
+
+                current_feature_ids[m.trainIdx] = prev_id
+                descriptor = descriptors[m.trainIdx] if descriptors is not None else None
+                self.feature_map[prev_id] = {
+                    'positions': [keypoints[m.trainIdx].pt],
+                    'descriptors': descriptor,
+                    'last_seen': timestamp.to_sec()
+                }
             
             # Extract matched feature points
             # cv2.findFundamentalMat needs at least 8 point correspondences
@@ -288,19 +316,6 @@ class SLAMNode(DTROS):
                     
                     self.current_pose = self.current_pose @ np.linalg.inv(pose_delta)
                     
-                    # Track features for map
-                    for m in good_matches:
-                        feature_id = m.queryIdx
-                        if feature_id not in self.feature_map:
-                            self.feature_map[feature_id] = {
-                                'positions': [self.prev_features[0][m.queryIdx].pt],
-                                'descriptors': self.prev_features[1][m.queryIdx],
-                                'last_seen': timestamp.to_sec()
-                            }
-                        else:
-                            # Overwrite instead of append to prevent unbounded memory growth
-                            self.feature_map[feature_id]['positions'] = [keypoints[m.trainIdx].pt]
-                            self.feature_map[feature_id]['last_seen'] = timestamp.to_sec()
             
             # Draw matches on visualization
             visualization = cv2.drawMatches(
@@ -314,6 +329,17 @@ class SLAMNode(DTROS):
                 singlePointColor=(255, 0, 0),
                 flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
             )
+
+        # Assign IDs to unmatched current features so they can be tracked in future frames.
+        for idx in range(len(current_feature_ids)):
+            if current_feature_ids[idx] is None:
+                current_feature_ids[idx] = self._next_feature_id()
+                descriptor = descriptors[idx] if descriptors is not None else None
+                self.feature_map[current_feature_ids[idx]] = {
+                    'positions': [keypoints[idx].pt],
+                    'descriptors': descriptor,
+                    'last_seen': timestamp.to_sec()
+                }
         
         # Draw keypoints
         visualization_with_kp = cv2.drawKeypoints(
@@ -338,6 +364,7 @@ class SLAMNode(DTROS):
         # Update for next frame
         self.prev_gray = gray
         self.prev_features = (keypoints, descriptors)
+        self.prev_feature_ids = current_feature_ids
         self.frame_count += 1
         
     def publish_camera_motion(self, timestamp):
@@ -375,6 +402,11 @@ class SLAMNode(DTROS):
         # Extract rotation as quaternion
         quaternion = tf_trans.quaternion_from_matrix(pose_robot)
         pose_msg.pose.orientation = Quaternion(*quaternion)
+
+        # Convert camera-origin pose to base_link-origin pose using camera offset.
+        yaw = tf_trans.euler_from_quaternion(quaternion)[2]
+        pose_msg.pose.position.x -= (self.camera_offset_x_m * math.cos(yaw) - self.camera_offset_y_m * math.sin(yaw))
+        pose_msg.pose.position.y -= (self.camera_offset_x_m * math.sin(yaw) + self.camera_offset_y_m * math.cos(yaw))
         
         self.motion_pub.publish(pose_msg)
 
@@ -410,6 +442,12 @@ class SLAMNode(DTROS):
             quaternion.z,
             quaternion.w,
         ])[2]
+
+    def _next_feature_id(self):
+        """Return a persistent feature track ID."""
+        feature_id = self.feature_id_counter
+        self.feature_id_counter += 1
+        return feature_id
         
     def publish_feature_cloud(self, timestamp):
         """

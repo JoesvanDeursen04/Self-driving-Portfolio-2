@@ -17,6 +17,8 @@
         <param name="duckie_score_threshold" value="0.35"/>
         <param name="duckie_nms_threshold" value="0.4"/>
         <param name="tag_size_m" value="0.08"/>
+        <param name="camera_offset_x_m" value="0.06"/>
+        <param name="camera_offset_y_m" value="0.0"/>
         <!-- Camera calibration fallback (camera_info topic takes priority) -->
         <param name="fx" value="183"/>
         <param name="fy" value="183"/>

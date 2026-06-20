@@ -67,6 +67,8 @@ class SemanticPerceptionNode(DTROS):
         self.duckie_score_threshold = float(rospy.get_param('~duckie_score_threshold', 0.35))
         self.duckie_nms_threshold = float(rospy.get_param('~duckie_nms_threshold', 0.4))
         self.tag_size_m = float(rospy.get_param('~tag_size_m', 0.08))
+        self.camera_offset_x_m = float(rospy.get_param('~camera_offset_x_m', 0.06))
+        self.camera_offset_y_m = float(rospy.get_param('~camera_offset_y_m', 0.0))
         self.tag_semantics_file = rospy.get_param('~tag_semantics_file', '')
         self.tag_semantics = self._load_tag_semantics(rospy.get_param('~tag_semantics', {}), self.tag_semantics_file)
 
@@ -336,14 +338,16 @@ class SemanticPerceptionNode(DTROS):
     def _project_camera_point_to_world(self, forward_m, lateral_m, label):
         # Camera lateral is positive to the right; robot/world y is positive to the left.
         lateral_left_m = -lateral_m
+        forward_base_m = forward_m + self.camera_offset_x_m
+        lateral_base_m = lateral_left_m + self.camera_offset_y_m
         if self.current_pose is None:
-            return forward_m, lateral_left_m
+            return forward_base_m, lateral_base_m
 
         yaw = self._quaternion_to_yaw(self.current_pose.pose.orientation)
         robot_x = self.current_pose.pose.position.x
         robot_y = self.current_pose.pose.position.y
-        world_x = robot_x + (forward_m * math.cos(yaw)) - (lateral_left_m * math.sin(yaw))
-        world_y = robot_y + (forward_m * math.sin(yaw)) + (lateral_left_m * math.cos(yaw))
+        world_x = robot_x + (forward_base_m * math.cos(yaw)) - (lateral_base_m * math.sin(yaw))
+        world_y = robot_y + (forward_base_m * math.sin(yaw)) + (lateral_base_m * math.cos(yaw))
         return world_x, world_y
 
     def _integrate_observations(self, observations):
