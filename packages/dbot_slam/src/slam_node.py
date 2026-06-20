@@ -56,6 +56,7 @@ class SLAMNode(DTROS):
         self.feature_map = {}  # 3D map of features
         self.feature_id_counter = 0
         self.last_keyframe_pose = np.eye(4)
+        self.translation_scale = rospy.get_param('~translation_scale', 0.03)  # meters per frame
         
         # Previous frame data for tracking
         self.prev_gray = None
@@ -233,7 +234,7 @@ class SLAMNode(DTROS):
                     # Update pose
                     pose_delta = np.eye(4)
                     pose_delta[:3, :3] = R
-                    pose_delta[:3, 3] = t.flatten()
+                    pose_delta[:3, 3] = (t.flatten() * self.translation_scale)
                     
                     self.current_pose = self.current_pose @ np.linalg.inv(pose_delta)
                     
@@ -298,7 +299,7 @@ class SLAMNode(DTROS):
         """
         pose_msg = PoseStamped()
         pose_msg.header.stamp = timestamp
-        pose_msg.header.frame_id = 'camera_frame'
+        pose_msg.header.frame_id = self.camera_frame
         
         # Extract position
         pose_msg.pose.position.x = self.current_pose[0, 3]

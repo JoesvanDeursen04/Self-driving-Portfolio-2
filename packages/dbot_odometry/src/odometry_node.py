@@ -63,6 +63,11 @@ class OdometryNode(DTROS):
         # Frame IDs
         self.odom_frame = 'odom'
         self.base_frame = f'{self.robot_name}/base_link'
+
+        # Odometry covariance (pose uncertainty)
+        self.odom_cov_x = rospy.get_param('~odom_cov_x', 0.02)
+        self.odom_cov_y = rospy.get_param('~odom_cov_y', 0.02)
+        self.odom_cov_yaw = rospy.get_param('~odom_cov_yaw', 0.02)
         
         # Create transform broadcaster
         self.br = tf.TransformBroadcaster()
@@ -195,6 +200,12 @@ class OdometryNode(DTROS):
         # Convert theta to quaternion
         quaternion = tf.transformations.quaternion_from_euler(0, 0, self.theta)
         odom.pose.pose.orientation = Quaternion(*quaternion)
+
+        # Non-zero covariance is required for downstream fusion/filtering.
+        odom.pose.covariance = [0.0] * 36
+        odom.pose.covariance[0] = self.odom_cov_x   # x variance
+        odom.pose.covariance[7] = self.odom_cov_y   # y variance
+        odom.pose.covariance[35] = self.odom_cov_yaw  # yaw variance
         
         # Publish odometry
         self.odom_pub.publish(odom)

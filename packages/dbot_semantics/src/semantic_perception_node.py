@@ -239,7 +239,7 @@ class SemanticPerceptionNode(DTROS):
         if self.net is None:
             return observations
 
-        input_size = 640
+        input_size = 320
         blob = cv2.dnn.blobFromImage(frame, 1.0 / 255.0, (input_size, input_size), swapRB=True, crop=False)
         self.net.setInput(blob)
         outputs = self.net.forward(self.net.getUnconnectedOutLayersNames())
