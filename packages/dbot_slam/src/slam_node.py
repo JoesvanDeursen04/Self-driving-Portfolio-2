@@ -64,13 +64,16 @@ class SLAMNode(DTROS):
         self.motion_epsilon_m = rospy.get_param('~motion_epsilon_m', 0.002)
         self.odom_stale_timeout_s = rospy.get_param('~odom_stale_timeout_s', 0.2)
         self.use_odom_for_scale = rospy.get_param('~use_odom_for_scale', True)
+        self.max_visual_scale_m = rospy.get_param('~max_visual_scale_m', 0.1)
 
         # Odom state for dynamic visual scale
         self.lock = threading.Lock()
         self.latest_odom_pose = None  # np.array([x, y, theta])
         self.latest_odom_stamp = None
-        self.last_used_odom_pose = None
-        self.last_used_odom_stamp = None
+        self.prev_odom_pose_for_speed = None
+        self.prev_odom_stamp_for_speed = None
+        self.odom_speed_mps = 0.0
+        self.last_scale_frame_stamp = None
         
         # Previous frame data for tracking
         self.prev_gray = None
@@ -161,12 +164,27 @@ class SLAMNode(DTROS):
     def odometry_callback(self, msg):
         """Store latest odometry pose for dynamic visual translation scaling."""
         with self.lock:
-            self.latest_odom_pose = np.array([
+            odom_pose = np.array([
                 msg.pose.pose.position.x,
                 msg.pose.pose.position.y,
                 self._quaternion_to_yaw(msg.pose.pose.orientation),
             ])
-            self.latest_odom_stamp = msg.header.stamp
+            odom_stamp = msg.header.stamp
+
+            if (
+                self.prev_odom_pose_for_speed is not None
+                and self.prev_odom_stamp_for_speed is not None
+                and odom_stamp > self.prev_odom_stamp_for_speed
+            ):
+                dt = (odom_stamp - self.prev_odom_stamp_for_speed).to_sec()
+                if dt > 1e-4:
+                    delta_xy = float(np.linalg.norm(odom_pose[:2] - self.prev_odom_pose_for_speed[:2]))
+                    self.odom_speed_mps = delta_xy / dt
+
+            self.latest_odom_pose = odom_pose
+            self.latest_odom_stamp = odom_stamp
+            self.prev_odom_pose_for_speed = odom_pose
+            self.prev_odom_stamp_for_speed = odom_stamp
 
     def compressed_image_callback(self, msg):
         """Decode a CompressedImage from the real Duckiebot camera and process it."""
@@ -362,26 +380,27 @@ class SLAMNode(DTROS):
 
     def _get_translation_scale(self, timestamp):
         """Return dynamic translation scale from odometry delta (fallback to static scale)."""
+        if self.last_scale_frame_stamp is None:
+            self.last_scale_frame_stamp = timestamp
+            return 0.0
+
+        frame_dt = (timestamp - self.last_scale_frame_stamp).to_sec()
+        frame_dt = max(1e-4, min(frame_dt, self.odom_stale_timeout_s))
+        self.last_scale_frame_stamp = timestamp
+
         if not self.use_odom_for_scale:
             return self.translation_scale
 
         with self.lock:
-            if self.latest_odom_pose is None or self.latest_odom_stamp is None:
-                return 0.0
-
-            if self.last_used_odom_pose is None:
-                self.last_used_odom_pose = self.latest_odom_pose.copy()
-                self.last_used_odom_stamp = self.latest_odom_stamp
+            if self.latest_odom_stamp is None:
                 return 0.0
 
             stamp_age = (timestamp - self.latest_odom_stamp).to_sec()
             if stamp_age > self.odom_stale_timeout_s:
                 return 0.0
 
-            delta_xy = np.linalg.norm(self.latest_odom_pose[:2] - self.last_used_odom_pose[:2])
-            self.last_used_odom_pose = self.latest_odom_pose.copy()
-            self.last_used_odom_stamp = self.latest_odom_stamp
-            return float(delta_xy)
+            scale_m = self.odom_speed_mps * frame_dt
+            return float(min(scale_m, self.max_visual_scale_m))
 
     def _quaternion_to_yaw(self, quaternion):
         """Convert geometry_msgs/Quaternion to yaw angle in radians."""

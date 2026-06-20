@@ -220,6 +220,7 @@ class SensorFusionNode(DTROS):
         self.control_w = 0.0
         self.max_linear_speed = rospy.get_param('~max_linear_speed', 1.0)
         self.max_angular_speed = rospy.get_param('~max_angular_speed', 6.0)
+        self.use_odom_measurement_update = rospy.get_param('~use_odom_measurement_update', False)
 
         # Vision reset/outlier guards
         self.vision_reset_near_zero_m = rospy.get_param('~vision_reset_near_zero_m', 0.1)
@@ -432,11 +433,14 @@ class SensorFusionNode(DTROS):
                 # Prediction step
                 self.ekf.predict(dt, self.control_v, self.control_w)
                 
-                # Update with odometry if available
-                if self.odom_buffer is not None:
+                # Optionally update with odometry measurement.
+                # Default is disabled to avoid counting odometry in both predict and update.
+                if self.use_odom_measurement_update and self.odom_buffer is not None:
                     self.ekf.update_odometry(self.odom_buffer)
                     self.odom_buffer = None
                     rospy.logdebug("Odometry update applied")
+                elif self.odom_buffer is not None:
+                    self.odom_buffer = None
                 
                 # Update with vision if available
                 if self.vision_delta_buffer is not None:

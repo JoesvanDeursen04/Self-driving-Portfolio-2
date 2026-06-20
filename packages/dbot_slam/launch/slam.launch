@@ -27,6 +27,7 @@
         <param name="translation_scale" value="0.03"/>
         <param name="motion_epsilon_m" value="0.002"/>
         <param name="odom_stale_timeout_s" value="0.2"/>
+        <param name="max_visual_scale_m" value="0.1"/>
         <param name="odom_frame" value="odom"/>
     </node>
 

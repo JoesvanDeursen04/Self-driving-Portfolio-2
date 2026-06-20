@@ -16,6 +16,7 @@
         <param name="max_predict_dt" value="0.2"/>
         <param name="max_linear_speed" value="1.0"/>
         <param name="max_angular_speed" value="6.0"/>
+        <param name="use_odom_measurement_update" value="false"/>
 
         <!-- Vision relative-update guards -->
         <param name="vision_reset_near_zero_m" value="0.1"/>
