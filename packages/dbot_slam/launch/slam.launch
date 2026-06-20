@@ -21,6 +21,13 @@
         <param name="use_compressed" value="$(arg use_compressed)"/>
         <param name="camera_topic" value="/$(arg robot_name)/camera_node/image/compressed" if="$(arg use_compressed)"/>
         <param name="camera_topic" value="/$(arg robot_name)/camera/image_raw" unless="$(arg use_compressed)"/>
+
+        <!-- Motion scaling and stabilization -->
+        <param name="use_odom_for_scale" value="true"/>
+        <param name="translation_scale" value="0.03"/>
+        <param name="motion_epsilon_m" value="0.002"/>
+        <param name="odom_stale_timeout_s" value="0.2"/>
+        <param name="odom_frame" value="odom"/>
     </node>
 
 </launch>

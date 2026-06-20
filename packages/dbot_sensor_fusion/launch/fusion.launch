@@ -11,6 +11,16 @@
         
         <!-- Filter update rate -->
         <param name="update_rate" value="30"/>             <!-- 30 Hz -->
+
+        <!-- EKF timing and motion model guards -->
+        <param name="max_predict_dt" value="0.2"/>
+        <param name="max_linear_speed" value="1.0"/>
+        <param name="max_angular_speed" value="6.0"/>
+
+        <!-- Vision relative-update guards -->
+        <param name="vision_reset_near_zero_m" value="0.1"/>
+        <param name="vision_reset_previous_far_m" value="0.5"/>
+        <param name="max_vision_delta_m" value="0.5"/>
     </node>
     
 </launch>

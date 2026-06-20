@@ -16,6 +16,7 @@ Topics:
 import rospy
 from sensor_msgs.msg import Image, PointCloud2, PointField, CompressedImage, CameraInfo
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 from cv_bridge import CvBridge
 import cv2
@@ -23,6 +24,7 @@ import numpy as np
 import math
 import tf.transformations as tf_trans
 from collections import deque
+import threading
 from duckietown.dtros import DTROS, NodeType
 
 
@@ -41,6 +43,8 @@ class SLAMNode(DTROS):
         # Robot and frame parameters
         self.robot_name = rospy.get_param('~robot_name', 'duckiebot')
         self.camera_frame = f'{self.robot_name}/camera'
+        self.base_frame = f'{self.robot_name}/base_link'
+        self.odom_frame = rospy.get_param('~odom_frame', 'odom')
         self.camera_matrix = None
         self.dist_coeffs = None
         
@@ -56,7 +60,17 @@ class SLAMNode(DTROS):
         self.feature_map = {}  # 3D map of features
         self.feature_id_counter = 0
         self.last_keyframe_pose = np.eye(4)
-        self.translation_scale = rospy.get_param('~translation_scale', 0.03)  # meters per frame
+        self.translation_scale = rospy.get_param('~translation_scale', 0.03)  # fallback meters per frame
+        self.motion_epsilon_m = rospy.get_param('~motion_epsilon_m', 0.002)
+        self.odom_stale_timeout_s = rospy.get_param('~odom_stale_timeout_s', 0.2)
+        self.use_odom_for_scale = rospy.get_param('~use_odom_for_scale', True)
+
+        # Odom state for dynamic visual scale
+        self.lock = threading.Lock()
+        self.latest_odom_pose = None  # np.array([x, y, theta])
+        self.latest_odom_stamp = None
+        self.last_used_odom_pose = None
+        self.last_used_odom_stamp = None
         
         # Previous frame data for tracking
         self.prev_gray = None
@@ -123,6 +137,8 @@ class SLAMNode(DTROS):
             self.camera_info_callback
         )
 
+        rospy.Subscriber('/odometry', Odometry, self.odometry_callback)
+
         # Subscribe to camera images
         if self.use_compressed:
             rospy.Subscriber(self.camera_topic, CompressedImage, self.compressed_image_callback)
@@ -141,6 +157,16 @@ class SLAMNode(DTROS):
             self.fy = float(self.camera_matrix[1, 1])
             self.cx = float(self.camera_matrix[0, 2])
             self.cy = float(self.camera_matrix[1, 2])
+
+    def odometry_callback(self, msg):
+        """Store latest odometry pose for dynamic visual translation scaling."""
+        with self.lock:
+            self.latest_odom_pose = np.array([
+                msg.pose.pose.position.x,
+                msg.pose.pose.position.y,
+                self._quaternion_to_yaw(msg.pose.pose.orientation),
+            ])
+            self.latest_odom_stamp = msg.header.stamp
 
     def compressed_image_callback(self, msg):
         """Decode a CompressedImage from the real Duckiebot camera and process it."""
@@ -234,7 +260,13 @@ class SLAMNode(DTROS):
                     # Update pose
                     pose_delta = np.eye(4)
                     pose_delta[:3, :3] = R
-                    pose_delta[:3, 3] = (t.flatten() * self.translation_scale)
+                    scale_m = self._get_translation_scale(timestamp)
+                    t_vec = t.flatten()
+                    t_norm = np.linalg.norm(t_vec)
+                    if scale_m <= self.motion_epsilon_m or t_norm < 1e-9:
+                        pose_delta[:3, 3] = np.zeros(3)
+                    else:
+                        pose_delta[:3, 3] = (t_vec / t_norm) * scale_m
                     
                     self.current_pose = self.current_pose @ np.linalg.inv(pose_delta)
                     
@@ -299,7 +331,7 @@ class SLAMNode(DTROS):
         """
         pose_msg = PoseStamped()
         pose_msg.header.stamp = timestamp
-        pose_msg.header.frame_id = self.camera_frame
+        pose_msg.header.frame_id = self.odom_frame
         
         # Extract position
         # Convert OpenCV camera axes to robot axes:
@@ -327,6 +359,38 @@ class SLAMNode(DTROS):
         pose_msg.pose.orientation = Quaternion(*quaternion)
         
         self.motion_pub.publish(pose_msg)
+
+    def _get_translation_scale(self, timestamp):
+        """Return dynamic translation scale from odometry delta (fallback to static scale)."""
+        if not self.use_odom_for_scale:
+            return self.translation_scale
+
+        with self.lock:
+            if self.latest_odom_pose is None or self.latest_odom_stamp is None:
+                return 0.0
+
+            if self.last_used_odom_pose is None:
+                self.last_used_odom_pose = self.latest_odom_pose.copy()
+                self.last_used_odom_stamp = self.latest_odom_stamp
+                return 0.0
+
+            stamp_age = (timestamp - self.latest_odom_stamp).to_sec()
+            if stamp_age > self.odom_stale_timeout_s:
+                return 0.0
+
+            delta_xy = np.linalg.norm(self.latest_odom_pose[:2] - self.last_used_odom_pose[:2])
+            self.last_used_odom_pose = self.latest_odom_pose.copy()
+            self.last_used_odom_stamp = self.latest_odom_stamp
+            return float(delta_xy)
+
+    def _quaternion_to_yaw(self, quaternion):
+        """Convert geometry_msgs/Quaternion to yaw angle in radians."""
+        return tf_trans.euler_from_quaternion([
+            quaternion.x,
+            quaternion.y,
+            quaternion.z,
+            quaternion.w,
+        ])[2]
         
     def publish_feature_cloud(self, timestamp):
         """

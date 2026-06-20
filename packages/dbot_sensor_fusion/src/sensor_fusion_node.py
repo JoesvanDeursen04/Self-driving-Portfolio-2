@@ -68,16 +68,31 @@ class ExtendedKalmanFilter:
             [0, 0, 0.2]
         ])
         
-    def predict(self, dt):
+    def predict(self, dt, control_v=0.0, control_w=0.0):
         """
-        Prediction step - no motion model update in this simplified version.
-        In a more advanced implementation, you would integrate motion commands.
+        Prediction step with a simple unicycle motion model.
         
         Args:
             dt: Time step
+            control_v: Forward speed in m/s
+            control_w: Angular speed in rad/s
         """
-        # Increase uncertainty over time due to process noise
-        self.P = self.P + self.Q * dt
+        theta = float(self.x[2])
+
+        # Predict state using kinematic model.
+        self.x[0] = self.x[0] + (control_v * dt * math.cos(theta))
+        self.x[1] = self.x[1] + (control_v * dt * math.sin(theta))
+        self.x[2] = self._normalize_angle(self.x[2] + (control_w * dt))
+
+        # Linearized Jacobian of the motion model.
+        F = np.array([
+            [1.0, 0.0, -control_v * dt * math.sin(theta)],
+            [0.0, 1.0, control_v * dt * math.cos(theta)],
+            [0.0, 0.0, 1.0],
+        ])
+
+        # Propagate covariance with process noise.
+        self.P = F @ self.P @ F.T + (self.Q * dt)
         
     def update_odometry(self, z_odom):
         """
@@ -130,6 +145,27 @@ class ExtendedKalmanFilter:
         
         # Update covariance
         self.P = (np.eye(3) - K) @ self.P
+
+    def update_vision_delta(self, delta_vision):
+        """
+        Update state with relative vision increment instead of absolute pose.
+
+        Args:
+            delta_vision: Increment [dx, dy, dtheta]
+        """
+        # Turn relative motion into a proposal around current state.
+        z = self.x + delta_vision
+        z[2] = self._normalize_angle(z[2])
+
+        y = z - self.x
+        y[2] = self._normalize_angle(y[2])
+
+        S = self.P + self.R_vision
+        K = self.P @ np.linalg.inv(S)
+
+        self.x = self.x + K @ y
+        self.x[2] = self._normalize_angle(self.x[2])
+        self.P = (np.eye(3) - K) @ self.P
         
     def get_pose(self):
         """
@@ -173,9 +209,22 @@ class SensorFusionNode(DTROS):
         
         # Measurement buffers
         self.odom_buffer = None
-        self.vision_buffer = None
+        self.vision_delta_buffer = None
         self.last_odom_time = None
         self.last_vision_time = None
+        self.prev_vision_pose = None
+        self.last_odom_for_velocity = None
+
+        # Motion model controls estimated from odometry
+        self.control_v = 0.0
+        self.control_w = 0.0
+        self.max_linear_speed = rospy.get_param('~max_linear_speed', 1.0)
+        self.max_angular_speed = rospy.get_param('~max_angular_speed', 6.0)
+
+        # Vision reset/outlier guards
+        self.vision_reset_near_zero_m = rospy.get_param('~vision_reset_near_zero_m', 0.1)
+        self.vision_reset_previous_far_m = rospy.get_param('~vision_reset_previous_far_m', 0.5)
+        self.max_vision_delta_m = rospy.get_param('~max_vision_delta_m', 0.5)
         
         # Thread lock for thread-safe access
         self.lock = threading.Lock()
@@ -215,12 +264,29 @@ class SensorFusionNode(DTROS):
         """
         with self.lock:
             # Extract pose
-            self.odom_buffer = np.array([
+            odom_pose = np.array([
                 msg.pose.pose.position.x,
                 msg.pose.pose.position.y,
                 self._quaternion_to_angle(msg.pose.pose.orientation)
             ])
+            self.odom_buffer = odom_pose
             self.last_odom_time = msg.header.stamp.to_sec()
+
+            # Estimate controls from odometry increments for EKF prediction.
+            if self.last_odom_for_velocity is not None:
+                prev_pose, prev_t = self.last_odom_for_velocity
+                dt = self.last_odom_time - prev_t
+                if dt > 1e-4:
+                    dx = odom_pose[0] - prev_pose[0]
+                    dy = odom_pose[1] - prev_pose[1]
+                    dtheta = self.ekf._normalize_angle(odom_pose[2] - prev_pose[2])
+                    forward = dx * math.cos(prev_pose[2]) + dy * math.sin(prev_pose[2])
+                    v = forward / dt
+                    w = dtheta / dt
+                    self.control_v = float(np.clip(v, -self.max_linear_speed, self.max_linear_speed))
+                    self.control_w = float(np.clip(w, -self.max_angular_speed, self.max_angular_speed))
+
+            self.last_odom_for_velocity = (odom_pose, self.last_odom_time)
             
     def vision_callback(self, msg):
         """
@@ -230,13 +296,34 @@ class SensorFusionNode(DTROS):
             msg: geometry_msgs/PoseStamped
         """
         with self.lock:
-            # Extract pose
-            self.vision_buffer = np.array([
+            # Extract pose and convert to relative increment.
+            vision_pose = np.array([
                 msg.pose.position.x,
                 msg.pose.position.y,
                 self._quaternion_to_angle(msg.pose.orientation)
             ])
             self.last_vision_time = msg.header.stamp.to_sec()
+
+            if self.prev_vision_pose is None:
+                self.prev_vision_pose = vision_pose
+                return
+
+            prev_norm = np.linalg.norm(self.prev_vision_pose[:2])
+            curr_norm = np.linalg.norm(vision_pose[:2])
+
+            # Detect SLAM restart/relocalization reset and re-anchor safely.
+            if curr_norm < self.vision_reset_near_zero_m and prev_norm > self.vision_reset_previous_far_m:
+                self.prev_vision_pose = vision_pose
+                return
+
+            delta = vision_pose - self.prev_vision_pose
+            delta[2] = self.ekf._normalize_angle(delta[2])
+            self.prev_vision_pose = vision_pose
+
+            if np.linalg.norm(delta[:2]) > self.max_vision_delta_m:
+                return
+
+            self.vision_delta_buffer = delta
             
     def _quaternion_to_angle(self, quaternion):
         """
@@ -343,7 +430,7 @@ class SensorFusionNode(DTROS):
                 self.last_predict_time = now_sec
 
                 # Prediction step
-                self.ekf.predict(dt)
+                self.ekf.predict(dt, self.control_v, self.control_w)
                 
                 # Update with odometry if available
                 if self.odom_buffer is not None:
@@ -352,9 +439,9 @@ class SensorFusionNode(DTROS):
                     rospy.logdebug("Odometry update applied")
                 
                 # Update with vision if available
-                if self.vision_buffer is not None:
-                    self.ekf.update_vision(self.vision_buffer)
-                    self.vision_buffer = None
+                if self.vision_delta_buffer is not None:
+                    self.ekf.update_vision_delta(self.vision_delta_buffer)
+                    self.vision_delta_buffer = None
                     rospy.logdebug("Vision update applied")
                 
                 # Publish fused estimates
