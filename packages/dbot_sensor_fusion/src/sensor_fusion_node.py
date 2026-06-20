@@ -225,6 +225,9 @@ class SensorFusionNode(DTROS):
         self.last_vision_time = None
         self.prev_vision_pose = None
         self.last_odom_for_velocity = None
+        self.vision_session_yaw_offset = None
+        self.use_vision_session_offset = rospy.get_param('~use_vision_session_offset', True)
+        self._warned_rotation_conflict = False
 
         # Motion model controls estimated from odometry
         self.control_v = 0.0
@@ -321,6 +324,8 @@ class SensorFusionNode(DTROS):
 
             if self.prev_vision_pose is None:
                 self.prev_vision_pose = vision_pose
+                if self.vision_session_yaw_offset is None:
+                    self.vision_session_yaw_offset = self.ekf.get_pose()[2]
                 return
 
             prev_norm = np.linalg.norm(self.prev_vision_pose[:2])
@@ -329,16 +334,37 @@ class SensorFusionNode(DTROS):
             # Detect SLAM restart/relocalization reset and re-anchor safely.
             if curr_norm < self.vision_reset_near_zero_m and prev_norm > self.vision_reset_previous_far_m:
                 self.prev_vision_pose = vision_pose
+                if self.use_vision_session_offset:
+                    self.vision_session_yaw_offset = self.ekf.get_pose()[2]
+                    rospy.loginfo(
+                        "Vision session reset detected, yaw offset re-anchored to %.3f rad",
+                        self.vision_session_yaw_offset
+                    )
                 return
 
             delta = vision_pose - self.prev_vision_pose
             delta[2] = self.ekf._normalize_angle(delta[2])
             self.prev_vision_pose = vision_pose
 
+            if self.use_vision_session_offset and self.vision_session_yaw_offset is not None:
+                delta = self._rotate_delta_xy(delta, self.vision_session_yaw_offset)
+
             if np.linalg.norm(delta[:2]) > self.max_vision_delta_m:
                 return
 
             self.vision_delta_buffer = delta
+
+    def _rotate_delta_xy(self, delta, yaw):
+        """Rotate 2D motion delta by yaw while preserving dtheta."""
+        cos_yaw = math.cos(yaw)
+        sin_yaw = math.sin(yaw)
+        dx = float(delta[0])
+        dy = float(delta[1])
+        return np.array([
+            (dx * cos_yaw) - (dy * sin_yaw),
+            (dx * sin_yaw) + (dy * cos_yaw),
+            float(delta[2]),
+        ])
             
     def _quaternion_to_angle(self, quaternion):
         """
@@ -458,11 +484,23 @@ class SensorFusionNode(DTROS):
                 
                 # Update with vision if available
                 if self.vision_delta_buffer is not None:
+                    if (
+                        self.use_vision_session_offset
+                        and self.rotate_vision_delta_to_world
+                        and not self._warned_rotation_conflict
+                    ):
+                        rospy.logwarn(
+                            "Both use_vision_session_offset and rotate_vision_delta_to_world are enabled; "
+                            "this can double-rotate vision deltas."
+                        )
+                        self._warned_rotation_conflict = True
+
+                    rotate_in_update = self.rotate_vision_delta_to_world and not self.use_vision_session_offset
                     current_yaw = self.ekf.get_pose()[2]
                     self.ekf.update_vision_delta(
                         self.vision_delta_buffer,
                         reference_yaw=current_yaw,
-                        rotate_delta_to_world=self.rotate_vision_delta_to_world
+                        rotate_delta_to_world=rotate_in_update
                     )
                     self.vision_delta_buffer = None
                     rospy.logdebug("Vision update applied")
