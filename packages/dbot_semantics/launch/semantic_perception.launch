@@ -24,6 +24,8 @@
         <param name="fy" value="183"/>
         <param name="cx" value="160"/>
         <param name="cy" value="120"/>
+        <param name="fallback_width_px" value="320"/>
+        <param name="fallback_height_px" value="240"/>
         <!-- Image transport mode -->
         <param name="use_compressed" value="$(arg use_compressed)"/>
         <param name="camera_topic" value="/$(arg robot_name)/camera_node/image/compressed" if="$(arg use_compressed)"/>

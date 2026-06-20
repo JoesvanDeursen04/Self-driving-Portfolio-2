@@ -59,6 +59,13 @@ class SemanticPerceptionNode(DTROS):
         self.fy = float(rospy.get_param('~fy', 183.0))
         self.cx = float(rospy.get_param('~cx', 160.0))
         self.cy = float(rospy.get_param('~cy', 120.0))
+        self.fallback_width_px = float(rospy.get_param('~fallback_width_px', 320.0))
+        self.fallback_height_px = float(rospy.get_param('~fallback_height_px', 240.0))
+        self.base_fx = self.fx
+        self.base_fy = self.fy
+        self.base_cx = self.cx
+        self.base_cy = self.cy
+        self.camera_info_received = False
         self.camera_matrix = np.array([[self.fx, 0.0, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]], dtype=np.float32)
         self.dist_coeffs = np.zeros((5, 1), dtype=np.float32)
 
@@ -167,6 +174,7 @@ class SemanticPerceptionNode(DTROS):
             self.fy = float(self.camera_matrix[1, 1])
             self.cx = float(self.camera_matrix[0, 2])
             self.cy = float(self.camera_matrix[1, 2])
+            self.camera_info_received = True
 
     def compressed_image_callback(self, msg):
         """Decode a CompressedImage from the real Duckiebot camera and process it."""
@@ -192,6 +200,8 @@ class SemanticPerceptionNode(DTROS):
         self._process_frame(frame, msg.header.stamp)
 
     def _process_frame(self, frame, stamp):
+        self._ensure_intrinsics_for_frame(frame)
+
         observations = []
         debug = frame.copy()
 
@@ -202,6 +212,24 @@ class SemanticPerceptionNode(DTROS):
         self._publish_markers(stamp)
         self._publish_debug_image(debug, stamp)
         self.frame_index += 1
+
+    def _ensure_intrinsics_for_frame(self, frame):
+        """Scale fallback intrinsics to current frame resolution until camera_info arrives."""
+        if self.camera_info_received:
+            return
+
+        frame_h, frame_w = frame.shape[:2]
+        scale_x = float(frame_w) / self.fallback_width_px
+        scale_y = float(frame_h) / self.fallback_height_px
+
+        self.fx = self.base_fx * scale_x
+        self.fy = self.base_fy * scale_y
+        self.cx = self.base_cx * scale_x
+        self.cy = self.base_cy * scale_y
+        self.camera_matrix = np.array(
+            [[self.fx, 0.0, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]],
+            dtype=np.float32
+        )
 
     def _detect_apriltags(self, frame, debug):
         observations = []

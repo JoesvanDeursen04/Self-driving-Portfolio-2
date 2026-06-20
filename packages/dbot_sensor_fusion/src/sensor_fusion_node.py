@@ -232,7 +232,9 @@ class SensorFusionNode(DTROS):
         self.max_linear_speed = rospy.get_param('~max_linear_speed', 1.0)
         self.max_angular_speed = rospy.get_param('~max_angular_speed', 6.0)
         self.use_odom_measurement_update = rospy.get_param('~use_odom_measurement_update', False)
-        self.rotate_vision_delta_to_world = rospy.get_param('~rotate_vision_delta_to_world', True)
+        # SLAM deltas are already expressed in the published global frame.
+        # Keep this disabled by default to avoid double-rotating vision motion.
+        self.rotate_vision_delta_to_world = rospy.get_param('~rotate_vision_delta_to_world', False)
 
         # Vision reset/outlier guards
         self.vision_reset_near_zero_m = rospy.get_param('~vision_reset_near_zero_m', 0.1)

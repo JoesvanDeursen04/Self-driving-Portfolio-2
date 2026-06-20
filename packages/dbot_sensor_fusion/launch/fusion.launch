@@ -17,7 +17,7 @@
         <param name="max_linear_speed" value="1.0"/>
         <param name="max_angular_speed" value="6.0"/>
         <param name="use_odom_measurement_update" value="false"/>
-        <param name="rotate_vision_delta_to_world" value="true"/>
+        <param name="rotate_vision_delta_to_world" value="false"/>
 
         <!-- Vision relative-update guards -->
         <param name="vision_reset_near_zero_m" value="0.1"/>
