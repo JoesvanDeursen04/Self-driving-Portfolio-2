@@ -334,14 +334,16 @@ class SemanticPerceptionNode(DTROS):
         return [x, y, w, h]
 
     def _project_camera_point_to_world(self, forward_m, lateral_m, label):
+        # Camera lateral is positive to the right; robot/world y is positive to the left.
+        lateral_left_m = -lateral_m
         if self.current_pose is None:
-            return forward_m, lateral_m
+            return forward_m, lateral_left_m
 
         yaw = self._quaternion_to_yaw(self.current_pose.pose.orientation)
         robot_x = self.current_pose.pose.position.x
         robot_y = self.current_pose.pose.position.y
-        world_x = robot_x + (forward_m * math.cos(yaw)) - (lateral_m * math.sin(yaw))
-        world_y = robot_y + (forward_m * math.sin(yaw)) + (lateral_m * math.cos(yaw))
+        world_x = robot_x + (forward_m * math.cos(yaw)) - (lateral_left_m * math.sin(yaw))
+        world_y = robot_y + (forward_m * math.sin(yaw)) + (lateral_left_m * math.cos(yaw))
         return world_x, world_y
 
     def _integrate_observations(self, observations):

@@ -59,6 +59,8 @@ class OdometryNode(DTROS):
         self.right_encoder_prev = 0
         self.left_encoder_count = 0
         self.right_encoder_count = 0
+        self.left_encoder_initialized = False
+        self.right_encoder_initialized = False
         
         # Frame IDs
         self.odom_frame = 'odom'
@@ -102,6 +104,10 @@ class OdometryNode(DTROS):
             msg: WheelEncoderStamped message containing cumulative tick count
         """
         self.left_encoder_count = msg.data
+        if not self.left_encoder_initialized:
+            # Use first tick sample as baseline to avoid a startup jump.
+            self.left_encoder_prev = msg.data
+            self.left_encoder_initialized = True
         if msg.resolution > 0:
             self.encoder_ticks_per_revolution = msg.resolution
         
@@ -113,6 +119,10 @@ class OdometryNode(DTROS):
             msg: WheelEncoderStamped message containing cumulative tick count
         """
         self.right_encoder_count = msg.data
+        if not self.right_encoder_initialized:
+            # Use first tick sample as baseline to avoid a startup jump.
+            self.right_encoder_prev = msg.data
+            self.right_encoder_initialized = True
         if msg.resolution > 0:
             self.encoder_ticks_per_revolution = msg.resolution
         
@@ -133,6 +143,9 @@ class OdometryNode(DTROS):
         Update robot pose using differential drive kinematics.
         Uses encoder data to estimate wheel velocities and robot motion.
         """
+        if not (self.left_encoder_initialized and self.right_encoder_initialized):
+            return
+
         # Calculate distance traveled by each wheel
         left_distance = self.encoder_ticks_to_distance(
             self.left_encoder_count - self.left_encoder_prev

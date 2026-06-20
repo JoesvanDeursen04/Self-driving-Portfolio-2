@@ -182,7 +182,9 @@ class SensorFusionNode(DTROS):
         
         # Update rate
         self.update_rate = rospy.get_param('~update_rate', 30)
-        self.dt = 1.0 / self.update_rate
+        self.nominal_dt = 1.0 / self.update_rate
+        self.last_predict_time = None
+        self.max_predict_dt = rospy.get_param('~max_predict_dt', 0.2)
         
         # Publishers
         self.fused_pose_pub = rospy.Publisher(
@@ -332,8 +334,16 @@ class SensorFusionNode(DTROS):
         
         while not rospy.is_shutdown():
             with self.lock:
+                now_sec = rospy.Time.now().to_sec()
+                if self.last_predict_time is None:
+                    dt = self.nominal_dt
+                else:
+                    dt = now_sec - self.last_predict_time
+                    dt = max(1e-4, min(dt, self.max_predict_dt))
+                self.last_predict_time = now_sec
+
                 # Prediction step
-                self.ekf.predict(self.dt)
+                self.ekf.predict(dt)
                 
                 # Update with odometry if available
                 if self.odom_buffer is not None:

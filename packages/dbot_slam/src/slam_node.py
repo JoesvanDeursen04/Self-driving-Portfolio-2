@@ -302,12 +302,28 @@ class SLAMNode(DTROS):
         pose_msg.header.frame_id = self.camera_frame
         
         # Extract position
-        pose_msg.pose.position.x = self.current_pose[0, 3]
-        pose_msg.pose.position.y = self.current_pose[1, 3]
-        pose_msg.pose.position.z = self.current_pose[2, 3]
+        # Convert OpenCV camera axes to robot axes:
+        # camera z (forward) -> robot x, camera x (right) -> -robot y.
+        cam_x = self.current_pose[0, 3]
+        cam_y = self.current_pose[1, 3]
+        cam_z = self.current_pose[2, 3]
+        pose_msg.pose.position.x = cam_z
+        pose_msg.pose.position.y = -cam_x
+        pose_msg.pose.position.z = -cam_y
         
+        # Convert orientation from OpenCV camera frame to robot frame.
+        cam_to_robot = np.array([
+            [0.0, 0.0, 1.0],
+            [-1.0, 0.0, 0.0],
+            [0.0, -1.0, 0.0],
+        ])
+        rot_cam = self.current_pose[:3, :3]
+        rot_robot = cam_to_robot @ rot_cam @ cam_to_robot.T
+        pose_robot = np.eye(4)
+        pose_robot[:3, :3] = rot_robot
+
         # Extract rotation as quaternion
-        quaternion = tf_trans.quaternion_from_matrix(self.current_pose)
+        quaternion = tf_trans.quaternion_from_matrix(pose_robot)
         pose_msg.pose.orientation = Quaternion(*quaternion)
         
         self.motion_pub.publish(pose_msg)
